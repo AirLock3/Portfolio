@@ -1,0 +1,6 @@
+{
+  "name": "KIRYUSHA — Creative Developer & 3D Artist Portfolio",
+  "description": "Интерактивное киберпанк-портфолио Creative Developer, Animator и 3D Artist с процедурными 3D-объектами, нейросетевым Canvas-фоном, интерактивным терминалом и звуковым синтезом.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

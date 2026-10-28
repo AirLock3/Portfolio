@@ -1,0 +1,2528 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AirLock — Creative Developer & 3D Artist</title>
+  <meta name="description" content="Портфолио AirLock: интерактивные 3D-сцены, WebGL, процедурная геометрия и шейдерные эксперименты." />
+  <meta property="og:title" content="AirLock — Creative Developer & 3D Artist" />
+  <meta property="og:description" content="Портфолио AirLock: интерактивные 3D-сцены, WebGL, процедурная геометрия и шейдерные эксперименты." />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#0a0a0c" />
+
+  <style>
+    :root {
+      --bg-base: #0a0a0c;
+      --bg-surface: rgba(18, 20, 26, 0.78);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-lime: rgba(0, 255, 136, 0.35);
+      --border-cyan: rgba(0, 229, 255, 0.35);
+      --text-main: #f4f6f8;
+      --text-muted: #9aa3b2;
+      --text-dim: #646e7e;
+      --lime: #00ff88;
+      --cyan: #00e5ff;
+      --glow-lime: 0 0 24px rgba(0, 255, 136, 0.25);
+      --glow-cyan: 0 0 24px rgba(0, 229, 255, 0.22);
+      --font-display: 'Syne', 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 8px;
+      --ease: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      color-scheme: dark;
+    }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-main);
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    ::selection {
+      background: rgba(0, 255, 136, 0.22);
+      color: var(--lime);
+    }
+
+    a, button, input {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    a { text-decoration: none; }
+    ul { list-style: none; }
+
+    /* Индикатор прогресса скролла */
+    .scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      width: 100%;
+      background: linear-gradient(90deg, var(--lime), var(--cyan));
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+      z-index: 250;
+      pointer-events: none;
+    }
+
+    .grid-backdrop {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(circle at 50% 30%, black 35%, transparent 90%);
+      -webkit-mask-image: radial-gradient(circle at 50% 30%, black 35%, transparent 90%);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+      font-family: var(--font-mono);
+    }
+
+    /* Кастомный курсор */
+    .cursor-dot,
+    .cursor-ring {
+      position: fixed;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 9999;
+      border-radius: 50%;
+      transform: translate3d(-100px, -100px, 0);
+      transition: width 0.2s ease, height 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .cursor-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--lime);
+      box-shadow: 0 0 12px var(--lime);
+    }
+
+    .cursor-ring {
+      width: 36px;
+      height: 36px;
+      border: 1.5px solid rgba(0, 255, 136, 0.55);
+      background: rgba(0, 255, 136, 0.03);
+    }
+
+    .cursor-ring.is-hover {
+      width: 56px;
+      height: 56px;
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      box-shadow: 0 0 24px rgba(0, 229, 255, 0.3);
+    }
+
+    .cursor-dot.is-hover {
+      background: var(--cyan);
+      box-shadow: 0 0 14px var(--cyan);
+    }
+
+    @media (pointer: coarse), (max-width: 768px) {
+      .cursor-dot, .cursor-ring { display: none !important; }
+    }
+
+    /* Навигация */
+    .nav-wrap {
+      position: fixed;
+      top: 18px;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      padding: 0 16px;
+      pointer-events: none;
+    }
+
+    .pill-nav {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      width: 100%;
+      max-width: 1180px;
+      padding: 12px 22px;
+      background: rgba(12, 14, 19, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .brand {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .brand span { color: var(--lime); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-link {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+      position: relative;
+      padding: 4px 0;
+      transition: color var(--ease);
+    }
+
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 1.5px;
+      background: linear-gradient(90deg, var(--lime), var(--cyan));
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform var(--ease);
+    }
+
+    .nav-link:hover { color: var(--text-main); }
+    .nav-link:hover::after {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 6px 13px;
+      border-radius: 999px;
+      background: rgba(0, 255, 136, 0.07);
+      border: 1px solid rgba(0, 255, 136, 0.25);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 10px var(--lime);
+      animation: pulse 2.2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.25); opacity: 0.65; }
+    }
+
+    .sfx-btn {
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .sfx-btn:hover,
+    .sfx-btn[aria-pressed="true"] {
+      color: var(--lime);
+      border-color: var(--border-lime);
+      background: rgba(0, 255, 136, 0.08);
+    }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      padding: 132px 0 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 44px;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .kicker {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--cyan);
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 4.4vw, 4.1rem);
+      font-weight: 800;
+      line-height: 1.06;
+      letter-spacing: -0.03em;
+      margin-bottom: 22px;
+      text-wrap: balance;
+    }
+
+    .grad-text {
+      background: linear-gradient(100deg, #ffffff 10%, var(--lime) 52%, var(--cyan) 95%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display: inline-block;
+    }
+
+    .hero-lead {
+      font-size: 1.06rem;
+      color: var(--text-muted);
+      max-width: 58ch;
+      margin-bottom: 28px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin-bottom: 34px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+
+    .skill-tag {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: var(--radius-sm);
+      transition: border-color var(--ease), box-shadow var(--ease);
+      animation: floatY 4s ease-in-out infinite;
+    }
+
+    .skill-tag:nth-child(2) { animation-delay: 0.5s; }
+    .skill-tag:nth-child(3) { animation-delay: 1s; }
+    .skill-tag:nth-child(4) { animation-delay: 1.5s; }
+    .skill-tag:nth-child(5) { animation-delay: 2s; }
+
+    @keyframes floatY {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .skill-tag:hover {
+      border-color: var(--lime);
+      box-shadow: var(--glow-lime);
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .btn-main {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 28px;
+      border-radius: var(--radius-md);
+      background: var(--lime);
+      color: #050807;
+      font-weight: 700;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      box-shadow: 0 0 28px rgba(0, 255, 136, 0.32);
+      transition: transform var(--ease), box-shadow var(--ease), background var(--ease);
+    }
+
+    .btn-main:hover {
+      transform: translateY(-2px);
+      background: #22ff99;
+      box-shadow: 0 0 36px rgba(0, 255, 136, 0.52);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      transform: translateY(-2px);
+    }
+
+    /* 3D Стенд в Hero */
+    .stage-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(160deg, rgba(19, 22, 30, 0.86), rgba(10, 12, 16, 0.95));
+      border: 1px solid rgba(0, 255, 136, 0.22);
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), var(--glow-lime);
+      min-height: 460px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+
+    .stage-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .stage-hint { color: var(--cyan); }
+
+    #hero-object-canvas {
+      width: 100%;
+      height: 330px;
+      display: block;
+      cursor: grab;
+    }
+
+    #hero-object-canvas:active { cursor: grabbing; }
+
+    .stage-dock {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .model-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .model-tab {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .model-tab.active,
+    .model-tab:hover {
+      color: #050807;
+      background: var(--lime);
+    }
+
+    .stage-toggle {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--cyan);
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid var(--border-cyan);
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .stage-toggle[aria-pressed="true"],
+    .stage-toggle:hover {
+      background: var(--cyan);
+      color: #04080a;
+    }
+
+    .metrics-strip {
+      margin-top: 48px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      padding: 24px 28px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      position: relative;
+      z-index: 2;
+    }
+
+    .metric-val {
+      font-family: var(--font-display);
+      font-size: 1.9rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .metric-val span { color: var(--lime); }
+    .metric-lbl { font-size: 0.84rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* Бегущая строка-разделитель */
+    .ticker-wrap {
+      position: relative;
+      z-index: 2;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: rgba(12, 14, 18, 0.75);
+      padding: 14px 0;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .ticker-track {
+      display: flex;
+      width: max-content;
+      gap: 36px;
+      animation: tickerMove 28s linear infinite;
+    }
+
+    .ticker-item {
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 36px;
+    }
+
+    .ticker-sep { color: var(--lime); }
+
+    @keyframes tickerMove {
+      0% { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-50%, 0, 0); }
+    }
+
+    /* Секции */
+    section {
+      padding: 96px 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .sec-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    .sec-idx {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--lime);
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .sec-title {
+      font-family: var(--font-display);
+      font-size: clamp(1.85rem, 3vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+
+    .sec-sub {
+      color: var(--text-muted);
+      max-width: 54ch;
+      font-size: 0.98rem;
+      margin-top: 6px;
+    }
+
+    /* Проекты */
+    .filters {
+      display: inline-flex;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .filter-btn.active {
+      background: var(--lime);
+      color: #050807;
+      box-shadow: var(--glow-lime);
+    }
+
+    .filter-btn:hover:not(.active) {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 28px;
+      perspective: 1200px;
+    }
+
+    .project-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+      transform-style: preserve-3d;
+      transition: transform 160ms ease-out, border-color 200ms ease, box-shadow 200ms ease;
+      overflow: hidden;
+    }
+
+    .project-card:hover {
+      border-color: var(--border-lime);
+      box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 255, 136, 0.14);
+    }
+
+    .card-glare {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        circle at var(--gx, 50%) var(--gy, 50%),
+        rgba(0, 255, 136, 0.14),
+        rgba(0, 229, 255, 0.05) 38%,
+        transparent 70%
+      );
+      opacity: 0;
+      transition: opacity 200ms ease;
+      z-index: 1;
+    }
+
+    .project-card:hover .card-glare { opacity: 1; }
+
+    .preview-box {
+      position: relative;
+      height: 220px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at 50% 50%, rgba(0, 255, 136, 0.09), rgba(8, 10, 14, 0.95));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    .project-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .meta-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      z-index: 2;
+    }
+
+    .meta-accent { color: var(--lime); }
+
+    .project-title {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 700;
+      margin-top: 6px;
+      z-index: 2;
+    }
+
+    .project-summary {
+      color: var(--text-muted);
+      font-size: 0.94rem;
+      z-index: 2;
+    }
+
+    .card-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      z-index: 2;
+    }
+
+    .spec-text {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+
+    .btn-card {
+      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 255, 136, 0.1);
+      border: 1px solid var(--border-lime);
+      color: var(--lime);
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: all var(--ease);
+    }
+
+    .btn-card:hover {
+      background: var(--lime);
+      color: #050807;
+    }
+
+    /* Интерактивная 3D Песочница (Kinematics & Field Lab) */
+    .lab-card {
+      display: grid;
+      grid-template-columns: 1.35fr 0.65fr;
+      gap: 28px;
+      padding: 28px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+    }
+
+    .lab-viewport {
+      position: relative;
+      height: 360px;
+      border-radius: var(--radius-md);
+      background: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.09), rgba(7, 9, 13, 0.96));
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      overflow: hidden;
+    }
+
+    #lab-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .lab-hud {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .lab-controls {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+
+    .control-val {
+      font-family: var(--font-mono);
+      color: var(--lime);
+    }
+
+    .range-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      outline: none;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--lime);
+      box-shadow: 0 0 10px var(--lime);
+      cursor: pointer;
+    }
+
+    /* Стек и навыки */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    .skill-box {
+      padding: 28px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .skill-box-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .skill-box-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .skill-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .skill-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+
+    .skill-name { font-weight: 600; }
+    .skill-pct { font-family: var(--font-mono); font-size: 0.82rem; color: var(--lime); }
+
+    .bar-bg {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--lime), var(--cyan));
+      box-shadow: 0 0 12px rgba(0, 255, 136, 0.45);
+      width: var(--w, 90%);
+    }
+
+    .tools-row {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px;
+    }
+
+    .tool-tile {
+      padding: 16px 14px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: transform var(--ease), border-color var(--ease), box-shadow var(--ease);
+    }
+
+    .tool-tile:hover {
+      transform: translateY(-4px);
+      border-color: var(--cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .tool-title { font-weight: 700; font-size: 0.92rem; }
+    .tool-sub { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); }
+
+    /* Терминал */
+    .terminal {
+      border-radius: var(--radius-lg);
+      background: rgba(10, 12, 16, 0.94);
+      border: 1px solid rgba(0, 255, 136, 0.28);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), var(--glow-lime);
+      overflow: hidden;
+    }
+
+    .term-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding: 14px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .term-title {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .term-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--lime);
+      background: rgba(0, 255, 136, 0.08);
+      border: 1px solid rgba(0, 255, 136, 0.25);
+      transition: all var(--ease);
+    }
+
+    .chip-btn:hover {
+      background: var(--lime);
+      color: #050807;
+    }
+
+    .term-body {
+      padding: 22px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      min-height: 250px;
+      max-height: 350px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .term-line { line-height: 1.55; word-break: break-word; }
+    .term-line.echo { color: var(--cyan); font-weight: 600; }
+    .term-line.accent { color: var(--lime); }
+
+    .term-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 22px;
+      border-top: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .term-prompt {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--lime);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .term-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+    }
+
+    .term-send {
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 255, 136, 0.14);
+      border: 1px solid var(--border-lime);
+      color: var(--lime);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .term-send:hover {
+      background: var(--lime);
+      color: #050807;
+    }
+
+    /* Футер и Модальное окно */
+    .footer {
+      padding: 36px 0 48px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      position: relative;
+      z-index: 2;
+    }
+
+    .footer-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(4, 6, 9, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 740px;
+      border-radius: var(--radius-lg);
+      background: #10131a;
+      border: 1px solid var(--border-lime);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.85), var(--glow-lime);
+      padding: 32px;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      border-color: var(--lime);
+      color: var(--lime);
+    }
+
+    .modal-specs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 20px 0;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+    }
+
+    .spec-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .spec-val {
+      font-size: 0.94rem;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-grid,
+      .skills-grid,
+      .lab-card {
+        grid-template-columns: 1fr;
+      }
+      .metrics-strip { grid-template-columns: repeat(2, 1fr); }
+      .tools-row { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .projects-grid { grid-template-columns: 1fr; }
+      .tools-row { grid-template-columns: repeat(2, 1fr); }
+      .modal-specs { grid-template-columns: 1fr; }
+      .hero { padding-top: 108px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+  <div class="cursor-dot" id="cursor-dot" aria-hidden="true"></div>
+  <div class="cursor-ring" id="cursor-ring" aria-hidden="true"></div>
+  <div class="grid-backdrop" aria-hidden="true"></div>
+
+  <header class="nav-wrap">
+    <nav class="pill-nav" aria-label="Навигация">
+      <a href="#hero" class="brand" data-magnetic>AirLock<span>.3D</span></a>
+
+      <div class="nav-links">
+        <a href="#work" class="nav-link" data-magnetic>Проекты</a>
+        <a href="#lab" class="nav-link" data-magnetic>3D Лаборатория</a>
+        <a href="#skills" class="nav-link" data-magnetic>Стек</a>
+        <a href="#terminal" class="nav-link" data-magnetic>Терминал</a>
+      </div>
+
+      <div class="nav-right">
+        <div class="status-pill">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>Available for work</span>
+        </div>
+        <button type="button" id="sound-toggle-btn" class="sfx-btn" aria-pressed="true" data-magnetic>
+          SFX: ON
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section id="hero" class="hero">
+      <canvas id="hero-canvas" aria-hidden="true"></canvas>
+
+      <div class="container">
+        <div class="hero-grid">
+          <div>
+            <div class="kicker">AIRLOCK · CREATIVE DEVELOPER · 3D ARTIST · PROCEDURAL ANIMATOR</div>
+
+            <h1 class="hero-title">
+              <span data-decoder="АРХИТЕКТУРА">АРХИТЕКТУРА</span><br />
+              <span class="grad-text" data-decoder="ЦИФРОВЫХ 3D МИРОВ">ЦИФРОВЫХ 3D МИРОВ</span>
+            </h1>
+
+            <p class="hero-lead">
+              Разрабатываю интерактивные WebGL-сцены, процедурные 3D-объекты, шейдерные симуляции и нестандартные веб-интерфейсы с акцентом на чистую геометрию и плавную кинематику.
+            </p>
+
+            <div class="tag-row" aria-label="Ключевые навыки">
+              <span class="skill-tag">Three.js &amp; WebGL2</span>
+              <span class="skill-tag">GLSL Custom Shaders</span>
+              <span class="skill-tag">Procedural 3D Modeling</span>
+              <span class="skill-tag">Kinematic Physics</span>
+              <span class="skill-tag">Web Audio Synthesis</span>
+            </div>
+
+            <div class="cta-row">
+              <a href="#work" class="btn-main" data-magnetic>Смотреть 3D проекты</a>
+              <a href="#lab" class="btn-ghost" data-magnetic>Открыть 3D-песочницу</a>
+            </div>
+          </div>
+
+          <div class="stage-card">
+            <div class="stage-head">
+              <span>INTERACTIVE 3D VIEWPORT · 10-PART RIG</span>
+              <span class="stage-hint">Вращение 360° мышью</span>
+            </div>
+
+            <canvas id="hero-object-canvas" aria-label="Интерактивная 3D модель"></canvas>
+
+            <div class="stage-dock">
+              <div class="model-tabs" role="group" aria-label="Модели">
+                <button type="button" class="model-tab active" data-shape="mechCore">Aether Core</button>
+                <button type="button" class="model-tab" data-shape="gyroMatrix">Gyro Matrix</button>
+                <button type="button" class="model-tab" data-shape="orbitalDrone">Orbital Probe</button>
+              </div>
+
+              <div style="display: flex; gap: 6px;">
+                <button type="button" id="wireframe-view-btn" class="stage-toggle" aria-pressed="false">
+                  Shading: SOLID
+                </button>
+                <button type="button" id="explode-view-btn" class="stage-toggle" aria-pressed="false">
+                  Exploded: OFF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-strip">
+          <div>
+            <div class="metric-val tabular">45<span>+</span></div>
+            <div class="metric-lbl">Запущенных 3D и WebGL сцен</div>
+          </div>
+          <div>
+            <div class="metric-val tabular">120<span> FPS</span></div>
+            <div class="metric-lbl">Плавный рендер без просадок</div>
+          </div>
+          <div>
+            <div class="metric-val tabular">0<span> Deps</span></div>
+            <div class="metric-lbl">Чистый нативный движок</div>
+          </div>
+          <div>
+            <div class="metric-val tabular">6<span> лет</span></div>
+            <div class="metric-lbl">В 3D-графике и шейдерах</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ticker-wrap" aria-hidden="true">
+      <div class="ticker-track">
+        <div class="ticker-item">
+          <span>AIRLOCK.3D</span><span class="ticker-sep">✦</span>
+          <span>PROCEDURAL GEOMETRY</span><span class="ticker-sep">✦</span>
+          <span>REAL-TIME WEBGL SHADERS</span><span class="ticker-sep">✦</span>
+          <span>KINEMATIC RIGGING</span><span class="ticker-sep">✦</span>
+          <span>INTERACTIVE MOTION</span><span class="ticker-sep">✦</span>
+        </div>
+        <div class="ticker-item">
+          <span>AIRLOCK.3D</span><span class="ticker-sep">✦</span>
+          <span>PROCEDURAL GEOMETRY</span><span class="ticker-sep">✦</span>
+          <span>REAL-TIME WEBGL SHADERS</span><span class="ticker-sep">✦</span>
+          <span>KINEMATIC RIGGING</span><span class="ticker-sep">✦</span>
+          <span>INTERACTIVE MOTION</span><span class="ticker-sep">✦</span>
+        </div>
+      </div>
+    </div>
+
+    <section id="work">
+      <div class="container">
+        <div class="sec-head">
+          <div>
+            <span class="sec-idx">01. Избранные работы</span>
+            <h2 class="sec-title" data-decoder="ИНТЕРАКТИВНЫЕ 3D ПРОЕКТЫ">ИНТЕРАКТИВНЫЕ 3D ПРОЕКТЫ</h2>
+            <p class="sec-sub">
+              Каждая карточка рендерит собственную 3D-модель в реальном времени и реагирует на наклон курсора.
+            </p>
+          </div>
+
+          <div class="filters" role="tablist" aria-label="Категории проектов">
+            <button type="button" class="filter-btn active" data-filter="all" role="tab" aria-selected="true">Все работы (4)</button>
+            <button type="button" class="filter-btn" data-filter="3d" role="tab" aria-selected="false">3D Art &amp; Rig</button>
+            <button type="button" class="filter-btn" data-filter="webgl" role="tab" aria-selected="false">WebGL &amp; Shaders</button>
+            <button type="button" class="filter-btn" data-filter="motion" role="tab" aria-selected="false">Motion &amp; Design</button>
+          </div>
+        </div>
+
+        <div id="projects-grid" class="projects-grid"></div>
+      </div>
+    </section>
+
+    <section id="lab">
+      <div class="container">
+        <div class="sec-head">
+          <div>
+            <span class="sec-idx">02. Экспериментальный стенд</span>
+            <h2 class="sec-title" data-decoder="3D ЛАБОРАТОРИЯ ВОЛНОВОГО ПОЛЯ">3D ЛАБОРАТОРИЯ ВОЛНОВОГО ПОЛЯ</h2>
+            <p class="sec-sub">
+              Настраивайте параметры процедурной 3D-поверхности и тороидального аттрактора в реальном времени.
+            </p>
+          </div>
+        </div>
+
+        <div class="lab-card">
+          <div class="lab-viewport">
+            <div class="lab-hud">
+              <span>SURFACE: PROCEDURAL WAVE + TORUS KNOT</span>
+              <span id="lab-nodes-label" class="tabular">NODES: 324</span>
+            </div>
+            <canvas id="lab-canvas" aria-label="3D симуляция волнового поля"></canvas>
+          </div>
+
+          <div class="lab-controls">
+            <div class="control-group">
+              <div class="control-head">
+                <label for="lab-freq">Частота гармоник</label>
+                <span id="lab-freq-val" class="control-val tabular">1.8x</span>
+              </div>
+              <input id="lab-freq" type="range" class="range-slider" min="0.5" max="4.0" step="0.1" value="1.8" />
+            </div>
+
+            <div class="control-group">
+              <div class="control-head">
+                <label for="lab-amp">Амплитуда смещения</label>
+                <span id="lab-amp-val" class="control-val tabular">0.45</span>
+              </div>
+              <input id="lab-amp" type="range" class="range-slider" min="0.1" max="1.0" step="0.05" value="0.45" />
+            </div>
+
+            <div class="control-group">
+              <div class="control-head">
+                <label for="lab-speed">Скорость фазы</label>
+                <span id="lab-speed-val" class="control-val tabular">1.2x</span>
+              </div>
+              <input id="lab-speed" type="range" class="range-slider" min="0.2" max="3.0" step="0.1" value="1.2" />
+            </div>
+
+            <div style="display: flex; gap: 10px; padding-top: 8px;">
+              <button type="button" id="lab-mode-btn" class="btn-card" style="flex: 1;">
+                Режим: Волновая матрица
+              </button>
+              <button type="button" id="lab-pulse-btn" class="stage-toggle" style="padding: 9px 14px;">
+                Импульс
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills">
+      <div class="container">
+        <div class="sec-head">
+          <div>
+            <span class="sec-idx">03. Инженерный и художественный стек</span>
+            <h2 class="sec-title" data-decoder="ТЕХНОЛОГИИ И 3D ИНСТРУМЕНТЫ">ТЕХНОЛОГИИ И 3D ИНСТРУМЕНТЫ</h2>
+            <p class="sec-sub">
+              От процедурного моделирования и риггинга до кастомных шейдеров и оптимизации рендера.
+            </p>
+          </div>
+        </div>
+
+        <div class="skills-grid">
+          <div class="skill-box">
+            <div class="skill-box-head">
+              <h3 class="skill-box-title">Real-Time 3D &amp; Creative Coding</h3>
+              <span class="tabular" style="color: var(--lime); font-size: 0.82rem;">CORE ENGINE</span>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Three.js / WebGL2 / Custom BufferGeometry</span>
+                <span class="skill-pct tabular">96%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 96%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">GLSL Vertex &amp; Fragment Shaders</span>
+                <span class="skill-pct tabular">92%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 92%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Native JavaScript / Canvas 2D &amp; 3D Math</span>
+                <span class="skill-pct tabular">98%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 98%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Web Audio API Procedural Sound</span>
+                <span class="skill-pct tabular">88%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 88%;"></div></div>
+            </div>
+          </div>
+
+          <div class="skill-box">
+            <div class="skill-box-head">
+              <h3 class="skill-box-title">3D Art, Modeling &amp; Motion</h3>
+              <span class="tabular" style="color: var(--cyan); font-size: 0.82rem;">VISUAL CRAFT</span>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Blender 3D / Hard-Surface &amp; PBR</span>
+                <span class="skill-pct tabular">95%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 95%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Houdini Procedural Assets &amp; VEX</span>
+                <span class="skill-pct tabular">89%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 89%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Kinematic Rigging &amp; Constraints</span>
+                <span class="skill-pct tabular">94%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 94%;"></div></div>
+            </div>
+
+            <div class="skill-row">
+              <div class="skill-top">
+                <span class="skill-name">Lighting &amp; LookDev Optimization</span>
+                <span class="skill-pct tabular">93%</span>
+              </div>
+              <div class="bar-bg"><div class="bar-fill" style="--w: 93%;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tools-row">
+          <div class="tool-tile">
+            <span class="tool-title">WebGL 2.0</span>
+            <span class="tool-sub">GPU Pipeline</span>
+          </div>
+          <div class="tool-tile">
+            <span class="tool-title">Three.js</span>
+            <span class="tool-sub">3D Engine</span>
+          </div>
+          <div class="tool-tile">
+            <span class="tool-title">Blender 4.3</span>
+            <span class="tool-sub">3D Modeling</span>
+          </div>
+          <div class="tool-tile">
+            <span class="tool-title">Houdini FX</span>
+            <span class="tool-sub">Procedural</span>
+          </div>
+          <div class="tool-tile">
+            <span class="tool-title">GLSL / WGSL</span>
+            <span class="tool-sub">Custom Shaders</span>
+          </div>
+          <div class="tool-tile">
+            <span class="tool-title">Web Audio</span>
+            <span class="tool-sub">Synth SFX</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="terminal">
+      <div class="container">
+        <div class="sec-head">
+          <div>
+            <span class="sec-idx">04. Интерактивная консоль</span>
+            <h2 class="sec-title" data-decoder="ТЕРМИНАЛ AIRLOCK">ТЕРМИНАЛ AIRLOCK</h2>
+            <p class="sec-sub">
+              Доступные команды: <code>help</code>, <code>about</code>, <code>skills</code>, <code>projects</code>, <code>3d</code>, <code>clear</code>.
+            </p>
+          </div>
+        </div>
+
+        <div class="terminal">
+          <div class="term-bar">
+            <span class="term-title">airlock@3d-workstation:~</span>
+            <div class="term-chips">
+              <button type="button" class="chip-btn" data-cmd="help">help</button>
+              <button type="button" class="chip-btn" data-cmd="about">about</button>
+              <button type="button" class="chip-btn" data-cmd="skills">skills</button>
+              <button type="button" class="chip-btn" data-cmd="projects">projects</button>
+              <button type="button" class="chip-btn" data-cmd="3d">3d</button>
+              <button type="button" class="chip-btn" data-cmd="clear">clear</button>
+            </div>
+          </div>
+
+          <div id="terminal-output" class="term-body" role="log" aria-live="polite">
+            <div class="term-line accent">AirLock.3D v2.4 готов к работе. Все 3D-модули активны.</div>
+            <div class="term-line">Введите "help" или выберите команду выше.</div>
+          </div>
+
+          <form id="terminal-form" class="term-form" autocomplete="off">
+            <label for="terminal-input" class="term-prompt">guest@airlock3d:~$</label>
+            <input
+              id="terminal-input"
+              type="text"
+              class="term-input"
+              placeholder="Введите команду (help, about, skills, projects, 3d, clear)..."
+              aria-label="Команда терминала"
+            />
+            <button type="submit" class="term-send">Выполнить</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-row">
+      <div>© 2026 AirLock.3D — Creative Developer, Animator &amp; 3D Artist.</div>
+      <div>Native HTML5 / CSS3 / WebGL Math</div>
+    </div>
+  </footer>
+
+  <div id="project-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-project-title">
+    <div class="modal-box">
+      <button type="button" id="modal-close-btn" class="modal-close" aria-label="Закрыть">✕</button>
+      <div id="modal-project-meta" class="meta-line"></div>
+      <h3 id="modal-project-title" class="project-title" style="font-size: 1.8rem; margin-top: 8px;"></h3>
+      <p id="modal-project-desc" style="color: var(--text-muted); margin-top: 12px;"></p>
+
+      <div class="modal-specs">
+        <div>
+          <span class="spec-label">СТУДИЯ / ПРОЕКТ</span>
+          <div id="modal-project-client" class="spec-val"></div>
+        </div>
+        <div>
+          <span class="spec-label">РОЛЬ</span>
+          <div id="modal-project-role" class="spec-val"></div>
+        </div>
+        <div>
+          <span class="spec-label">ОПТИМИЗАЦИЯ</span>
+          <div id="modal-project-perf" class="spec-val tabular" style="color: var(--lime);"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <span class="spec-label">ТЕХНИЧЕСКАЯ АРХИТЕКТУРА</span>
+        <ul id="modal-project-arch" style="margin-top: 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--cyan);"></ul>
+      </div>
+
+      <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+        <button type="button" id="modal-select-3d-btn" class="btn-main">Открыть эту 3D-модель на главном стенде</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const PROJECTS = [
+        {
+          id: 'aether-core',
+          title: 'Aether Core Reactor 3D',
+          category: '3d',
+          categoryLabel: '3D Art & Procedural Rig',
+          year: '2026',
+          client: 'Hyperion Spatial Labs',
+          role: 'Lead 3D Artist & Technical Director',
+          fps: '120 FPS',
+          polygons: '48.4K Tris',
+          summary: 'Многокомпонентное процедурное ядро реактора с магнитными кольцами, энергетическими пилонами и кинематическим приводом.',
+          description: 'Составной 3D-ассет из 10 геометрических узлов: центрального октаэдрического кристалла, трёх независимых карданных колец с фасками и шести орбитальных спутников.',
+          architecture: ['Custom 3D Projection', 'Multi-Axis Gimbal Rig', 'Depth Painter Sorting', 'Zero-GC Render Loop'],
+          shapeType: 'mechCore'
+        },
+        {
+          id: 'chronos-gyro',
+          title: 'Chronos Gyroscope Engine',
+          category: 'webgl',
+          categoryLabel: 'WebGL & Shaders',
+          year: '2026',
+          client: 'Vortex Interactive',
+          role: 'Creative WebGL Developer',
+          fps: '144 FPS',
+          polygons: '62.0K Tris',
+          summary: 'Интерактивный пространственный гироскоп с физикой частиц, волновым полем и динамическим преломлением света.',
+          description: 'Гибридный 3D-движок, объединяющий многокольцевую сцену и реактивную сеть частиц с плавным демпфированием камеры и откликом на курсор.',
+          architecture: ['Spatial Hash Grid', 'Spring Physics Damping', '3D Torus Lattice', 'Web Audio Synth Link'],
+          shapeType: 'gyroMatrix'
+        },
+        {
+          id: 'kinetix-monolith',
+          title: 'Kinetix Monolith Sculpture',
+          category: 'motion',
+          categoryLabel: 'Motion & Animation',
+          year: '2025',
+          client: 'NeoTokyo Media Arts',
+          role: '3D Motion Designer',
+          fps: '90 FPS',
+          polygons: '36.8K Tris',
+          summary: 'Кинетическая архитектурная скульптура с процедурной морфинг-анимацией сегментов и синхронизированным световым контуром.',
+          description: 'Серия процедурных анимационных сцен для медиа-инсталляции. Каждый сегмент монолита вращается по гармоническим законам со сдвигом фазы.',
+          architecture: ['Harmonic Phase Kinematics', 'Prismatic Extrusion', 'Dynamic Rim Lighting', 'Timeline State Machine'],
+          shapeType: 'crystalPylon'
+        },
+        {
+          id: 'valkyrie-drone',
+          title: 'Valkyrie Orbital Probe',
+          category: '3d',
+          categoryLabel: '3D Art & Procedural Rig',
+          year: '2025',
+          client: 'Aegis Aerospace',
+          role: 'Senior 3D Generalist',
+          fps: '120 FPS',
+          polygons: '54.2K Tris',
+          summary: 'Орбитальный исследовательский зонд из 11 процедурных деталей с подвижными солнечными крыльями и сканирующим визором.',
+          description: 'Детализированный 3D-концепт космического аппарата: центральный корпус, 4 поворотных двигательных модуля, солнечные панели и импульсный сканер.',
+          architecture: ['11-Part Composite Assembly', 'Hard-Surface Procedural Mesh', 'Anisotropic Specular', 'Interactive Exploded View'],
+          shapeType: 'orbitalDrone'
+        }
+      ];
+
+      // Web Audio синтезатор коротких интерфейсных звуков
+      let soundEnabled = true;
+      let audioCtx = null;
+
+      function playSynth(type) {
+        if (!soundEnabled) return;
+        try {
+          if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) audioCtx = new Ctx();
+          }
+          if (!audioCtx) return;
+          if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          if (type === 'hover') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(680, now);
+            osc.frequency.exponentialRampToValueAtTime(920, now + 0.035);
+            gain.gain.setValueAtTime(0.016, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.045);
+          } else if (type === 'click') {
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(520, now);
+            osc.frequency.exponentialRampToValueAtTime(1180, now + 0.065);
+            gain.gain.setValueAtTime(0.045, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.08);
+          }
+        } catch (_) {}
+      }
+
+      const soundBtn = document.getElementById('sound-toggle-btn');
+      if (soundBtn) {
+        soundBtn.addEventListener('click', () => {
+          soundEnabled = !soundEnabled;
+          soundBtn.setAttribute('aria-pressed', String(soundEnabled));
+          soundBtn.textContent = soundEnabled ? 'SFX: ON' : 'SFX: OFF';
+          if (soundEnabled) playSynth('click');
+        });
+      }
+
+      // Прогресс скролла страницы
+      const scrollBar = document.getElementById('scroll-progress');
+      window.addEventListener('scroll', () => {
+        if (!scrollBar) return;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        const pct = max > 0 ? window.scrollY / max : 0;
+        scrollBar.style.transform = `scaleX(${Math.max(0, Math.min(1, pct)).toFixed(4)})`;
+      }, { passive: true });
+
+      // Кастомный курсор и магнитный отклик
+      const cursorDot = document.getElementById('cursor-dot');
+      const cursorRing = document.getElementById('cursor-ring');
+      let mouseX = window.innerWidth / 2;
+      let mouseY = window.innerHeight / 2;
+      let ringX = mouseX;
+      let ringY = mouseY;
+
+      window.addEventListener('pointermove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        if (cursorDot) {
+          cursorDot.style.transform = `translate3d(${mouseX - 4}px, ${mouseY - 4}px, 0)`;
+        }
+      }, { passive: true });
+
+      function bindInteractiveTargets() {
+        document.querySelectorAll('a, button, input, [data-magnetic]').forEach((el) => {
+          if (el.dataset.bound) return;
+          el.dataset.bound = '1';
+
+          el.addEventListener('pointerenter', () => {
+            if (cursorRing) cursorRing.classList.add('is-hover');
+            if (cursorDot) cursorDot.classList.add('is-hover');
+            playSynth('hover');
+          });
+
+          el.addEventListener('pointerleave', () => {
+            if (cursorRing) cursorRing.classList.remove('is-hover');
+            if (cursorDot) cursorDot.classList.remove('is-hover');
+            if (el.hasAttribute('data-magnetic')) el.style.transform = '';
+          });
+
+          if (el.hasAttribute('data-magnetic')) {
+            el.addEventListener('pointermove', (ev) => {
+              const r = el.getBoundingClientRect();
+              const dx = ev.clientX - (r.left + r.width / 2);
+              const dy = ev.clientY - (r.top + r.height / 2);
+              el.style.transform = `translate3d(${(dx * 0.18).toFixed(1)}px, ${(dy * 0.18).toFixed(1)}px, 0)`;
+            });
+          }
+
+          el.addEventListener('click', () => playSynth('click'));
+        });
+      }
+
+      // Построение составных 3D-моделей
+      function buildModel(shapeType) {
+        const vertices = [];
+        const edges = [];
+        const faces = [];
+
+        function addBox(cx, cy, cz, sx, sy, sz, group, color) {
+          const base = vertices.length;
+          const hx = sx / 2, hy = sy / 2, hz = sz / 2;
+          const pts = [
+            [-hx, -hy, -hz], [hx, -hy, -hz], [hx, hy, -hz], [-hx, hy, -hz],
+            [-hx, -hy, hz],  [hx, -hy, hz],  [hx, hy, hz],  [-hx, hy, hz]
+          ];
+          pts.forEach(([x, y, z]) => {
+            vertices.push({ x: cx + x, y: cy + y, z: cz + z, ox: cx, oy: cy, oz: cz, group, color });
+          });
+          [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]
+            .forEach(([a, b]) => edges.push({ a: base + a, b: base + b, color }));
+          [[0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[1,2,6,5],[0,3,7,4]]
+            .forEach((f) => faces.push({ indices: f.map((i) => base + i), color }));
+        }
+
+        function addOctahedron(cx, cy, cz, rad, group, color) {
+          const base = vertices.length;
+          [[0, rad, 0], [0, -rad, 0], [rad, 0, 0], [-rad, 0, 0], [0, 0, rad], [0, 0, -rad]]
+            .forEach(([x, y, z]) => {
+              vertices.push({ x: cx + x, y: cy + y, z: cz + z, ox: cx, oy: cy, oz: cz, group, color });
+            });
+          [[0,2],[0,3],[0,4],[0,5],[1,2],[1,3],[1,4],[1,5],[2,4],[4,3],[3,5],[5,2]]
+            .forEach(([a, b]) => edges.push({ a: base + a, b: base + b, color }));
+          [[0,2,4],[0,4,3],[0,3,5],[0,5,2],[1,4,2],[1,3,4],[1,5,3],[1,2,5]]
+            .forEach((f) => faces.push({ indices: f.map((i) => base + i), color }));
+        }
+
+        function addRing(radius, segs, tiltX, tiltZ, group, color) {
+          const base = vertices.length;
+          for (let i = 0; i < segs; i++) {
+            const a = (i / segs) * Math.PI * 2;
+            const x = Math.cos(a) * radius;
+            const z = Math.sin(a) * radius;
+            const y1 = -z * Math.sin(tiltX);
+            const z1 = z * Math.cos(tiltX);
+            const x2 = x * Math.cos(tiltZ) - y1 * Math.sin(tiltZ);
+            const y2 = x * Math.sin(tiltZ) + y1 * Math.cos(tiltZ);
+            vertices.push({
+              x: x2, y: y2, z: z1,
+              ox: Math.cos(a) * 0.45, oy: Math.sin(tiltX) * 0.35, oz: Math.sin(a) * 0.45,
+              group, color
+            });
+          }
+          for (let i = 0; i < segs; i++) {
+            edges.push({ a: base + i, b: base + ((i + 1) % segs), color });
+          }
+        }
+
+        if (shapeType === 'mechCore') {
+          addOctahedron(0, 0, 0, 0.72, 'core', '#00ff88');
+          addRing(1.22, 20, 0.35, 0.1, 'ring1', '#00e5ff');
+          addRing(1.48, 24, -0.55, 0.45, 'ring2', '#00ff88');
+          addRing(1.72, 18, 1.1, -0.3, 'ring3', '#00e5ff');
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            addBox(Math.cos(a) * 1.1, 0, Math.sin(a) * 1.1, 0.18, 0.65, 0.18, 'pylon', i % 2 === 0 ? '#00ff88' : '#00e5ff');
+          }
+        } else if (shapeType === 'gyroMatrix') {
+          addOctahedron(0, 0, 0, 0.55, 'core', '#00e5ff');
+          addRing(0.95, 18, 0.2, 0.8, 'ring1', '#00ff88');
+          addRing(1.28, 22, 0.9, -0.4, 'ring2', '#00e5ff');
+          addRing(1.62, 26, -0.4, 0.2, 'ring3', '#00ff88');
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            addOctahedron(Math.cos(a) * 1.45, Math.sin(a * 2) * 0.35, Math.sin(a) * 1.45, 0.18, 'pylon', '#00e5ff');
+          }
+        } else if (shapeType === 'crystalPylon') {
+          for (let i = -2; i <= 2; i++) {
+            const s = 1 - Math.abs(i) * 0.14;
+            addBox(0, i * 0.44, 0, 0.95 * s, 0.28, 0.95 * s, i % 2 === 0 ? 'ring1' : 'ring2', i % 2 === 0 ? '#00ff88' : '#00e5ff');
+          }
+          addOctahedron(0, 1.45, 0, 0.32, 'core', '#00e5ff');
+          addOctahedron(0, -1.45, 0, 0.32, 'core', '#00ff88');
+          addRing(1.45, 16, 0.15, -0.15, 'ring3', '#00ff88');
+        } else {
+          addBox(0, 0, 0, 0.82, 0.62, 1.15, 'core', '#00e5ff');
+          addOctahedron(0, 0, 0.85, 0.35, 'ring1', '#00ff88');
+          addBox(-1.25, 0, 0, 1.15, 0.06, 0.55, 'pylon', '#00ff88');
+          addBox(1.25, 0, 0, 1.15, 0.06, 0.55, 'pylon', '#00ff88');
+          addBox(-0.6, 0.42, -0.55, 0.22, 0.22, 0.55, 'ring2', '#00e5ff');
+          addBox(0.6, 0.42, -0.55, 0.22, 0.22, 0.55, 'ring2', '#00e5ff');
+          addBox(-0.6, -0.42, -0.55, 0.22, 0.22, 0.55, 'ring2', '#00e5ff');
+          addBox(0.6, -0.42, -0.55, 0.22, 0.22, 0.55, 'ring2', '#00e5ff');
+          addRing(1.55, 20, 0.5, 0.0, 'ring3', '#00ff88');
+        }
+
+        return { vertices, edges, faces };
+      }
+
+      let wireframeOnly = false;
+
+      function drawModel(ctx, width, height, model, time, rotX, rotY, explode) {
+        ctx.clearRect(0, 0, width, height);
+        const cx = width / 2;
+        const cy = height / 2;
+        const scale = Math.min(width, height) * 0.26;
+        const camDist = 4.2;
+
+        const grad = ctx.createRadialGradient(cx, cy, 8, cx, cy, scale * 1.5);
+        grad.addColorStop(0, 'rgba(0, 255, 136, 0.13)');
+        grad.addColorStop(0.55, 'rgba(0, 229, 255, 0.04)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+
+        const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+        const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+
+        const projected = model.vertices.map((v) => {
+          let lx = v.x + v.ox * explode * 1.15;
+          let ly = v.y + v.oy * explode * 1.15;
+          let lz = v.z + v.oz * explode * 1.15;
+
+          if (v.group === 'ring1') {
+            const a = time * 0.9;
+            const tx = lx * Math.cos(a) - lz * Math.sin(a);
+            lz = lx * Math.sin(a) + lz * Math.cos(a);
+            lx = tx;
+          } else if (v.group === 'ring2') {
+            const a = -time * 0.7;
+            const ty = ly * Math.cos(a) - lz * Math.sin(a);
+            lz = ly * Math.sin(a) + lz * Math.cos(a);
+            ly = ty;
+          } else if (v.group === 'pylon') {
+            ly += Math.sin(time * 2.2 + v.ox * 3) * 0.08;
+          }
+
+          const x1 = lx * cosY - lz * sinY;
+          const z1 = lx * sinY + lz * cosY;
+          const y2 = ly * cosX - z1 * sinX;
+          const z2 = ly * sinX + z1 * cosX;
+
+          const p = camDist / (camDist - z2);
+          return { sx: cx + x1 * scale * p, sy: cy - y2 * scale * p, z: z2, p, color: v.color };
+        });
+
+        if (!wireframeOnly) {
+          model.faces
+            .map((f) => ({
+              ...f,
+              avgZ: f.indices.reduce((sum, idx) => sum + projected[idx].z, 0) / f.indices.length
+            }))
+            .sort((a, b) => a.avgZ - b.avgZ)
+            .forEach((f) => {
+              ctx.beginPath();
+              f.indices.forEach((idx, i) => {
+                const pt = projected[idx];
+                if (i === 0) ctx.moveTo(pt.sx, pt.sy);
+                else ctx.lineTo(pt.sx, pt.sy);
+              });
+              ctx.closePath();
+              ctx.fillStyle = f.color === '#00ff88' ? 'rgba(0, 255, 136, 0.08)' : 'rgba(0, 229, 255, 0.08)';
+              ctx.fill();
+            });
+        }
+
+        model.edges.forEach((e) => {
+          const p1 = projected[e.a];
+          const p2 = projected[e.b];
+          const alpha = Math.max(0.18, Math.min(0.95, ((p1.z + p2.z) * 0.5 + 2.2) / 3.6));
+          ctx.beginPath();
+          ctx.moveTo(p1.sx, p1.sy);
+          ctx.lineTo(p2.sx, p2.sy);
+          ctx.strokeStyle = e.color === '#00ff88'
+            ? `rgba(0, 255, 136, ${alpha.toFixed(2)})`
+            : `rgba(0, 229, 255, ${alpha.toFixed(2)})`;
+          ctx.lineWidth = alpha > 0.6 ? 1.6 : 1.0;
+          ctx.stroke();
+        });
+
+        projected.forEach((pt) => {
+          if (pt.z > -0.8) {
+            ctx.beginPath();
+            ctx.arc(pt.sx, pt.sy, Math.max(1.3, 2.2 * (pt.p * 0.75)), 0, Math.PI * 2);
+            ctx.fillStyle = pt.color;
+            ctx.fill();
+          }
+        });
+      }
+
+      // Фон Hero-секции
+      const heroBgCanvas = document.getElementById('hero-canvas');
+      const heroBgCtx = heroBgCanvas ? heroBgCanvas.getContext('2d') : null;
+      const particles = [];
+
+      function resizeHeroBg() {
+        if (!heroBgCanvas) return;
+        const r = heroBgCanvas.parentElement.getBoundingClientRect();
+        heroBgCanvas.width = r.width;
+        heroBgCanvas.height = r.height;
+      }
+
+      function initParticles() {
+        particles.length = 0;
+        const w = heroBgCanvas ? heroBgCanvas.width : window.innerWidth;
+        const h = heroBgCanvas ? heroBgCanvas.height : window.innerHeight;
+        for (let i = 0; i < 56; i++) {
+          particles.push({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 0.65,
+            vy: (Math.random() - 0.5) * 0.65,
+            r: Math.random() * 1.8 + 1.1,
+            cyan: i % 3 === 0
+          });
+        }
+      }
+
+      function renderHeroBg(time) {
+        if (!heroBgCtx || !heroBgCanvas) return;
+        const w = heroBgCanvas.width;
+        const h = heroBgCanvas.height;
+        heroBgCtx.clearRect(0, 0, w, h);
+
+        const horizon = h * 0.68;
+        heroBgCtx.save();
+        heroBgCtx.strokeStyle = 'rgba(0, 255, 136, 0.08)';
+        for (let i = -16; i <= 16; i++) {
+          heroBgCtx.beginPath();
+          heroBgCtx.moveTo(w * 0.5 + i * 38, horizon);
+          heroBgCtx.lineTo(w * 0.5 + i * 145, h);
+          heroBgCtx.stroke();
+        }
+
+        for (let r = 0; r < 7; r++) {
+          const prog = (r / 7) + ((time * 0.12) % (1 / 7));
+          const py = horizon + Math.pow(prog, 1.7) * (h - horizon);
+          heroBgCtx.beginPath();
+          for (let x = 0; x <= w; x += 32) {
+            const wy = py + Math.sin(x * 0.012 + time * 2 + r) * 5 * prog;
+            if (x === 0) heroBgCtx.moveTo(x, wy);
+            else heroBgCtx.lineTo(x, wy);
+          }
+          heroBgCtx.strokeStyle = `rgba(0, 229, 255, ${(0.04 + prog * 0.11).toFixed(2)})`;
+          heroBgCtx.stroke();
+        }
+        heroBgCtx.restore();
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+
+          const dx = mouseX - p.x;
+          const dy = mouseY - p.y;
+          const d = Math.hypot(dx, dy);
+          if (d < 180 && d > 1) {
+            p.x -= (dx / d) * 0.55;
+            p.y -= (dy / d) * 0.55;
+          }
+
+          heroBgCtx.beginPath();
+          heroBgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          heroBgCtx.fillStyle = p.cyan ? '#00e5ff' : '#00ff88';
+          heroBgCtx.fill();
+
+          for (let j = i + 1; j < particles.length; j++) {
+            const p2 = particles[j];
+            const dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+            if (dist < 135) {
+              heroBgCtx.beginPath();
+              heroBgCtx.moveTo(p.x, p.y);
+              heroBgCtx.lineTo(p2.x, p2.y);
+              heroBgCtx.strokeStyle = `rgba(0, 255, 136, ${((1 - dist / 135) * 0.25).toFixed(2)})`;
+              heroBgCtx.lineWidth = 0.8;
+              heroBgCtx.stroke();
+            }
+          }
+        }
+      }
+
+      // Главный 3D стенд в Hero
+      const heroObjCanvas = document.getElementById('hero-object-canvas');
+      const heroObjCtx = heroObjCanvas ? heroObjCanvas.getContext('2d') : null;
+      let currentShape = 'mechCore';
+      let heroModel = buildModel(currentShape);
+      let draggingHero = false;
+      let prevX = 0, prevY = 0;
+      let heroRotX = 0.35, heroRotY = 0.65;
+      let targetExplode = 0, currentExplode = 0;
+
+      function resizeHeroObj() {
+        if (!heroObjCanvas) return;
+        const r = heroObjCanvas.getBoundingClientRect();
+        heroObjCanvas.width = Math.max(300, Math.floor(r.width));
+        heroObjCanvas.height = Math.max(260, Math.floor(r.height));
+      }
+
+      if (heroObjCanvas) {
+        heroObjCanvas.addEventListener('pointerdown', (e) => {
+          draggingHero = true;
+          prevX = e.clientX;
+          prevY = e.clientY;
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!draggingHero) return;
+          heroRotY += (e.clientX - prevX) * 0.01;
+          heroRotX = Math.max(-1.2, Math.min(1.2, heroRotX + (e.clientY - prevY) * 0.01));
+          prevX = e.clientX;
+          prevY = e.clientY;
+        }, { passive: true });
+        window.addEventListener('pointerup', () => { draggingHero = false; });
+      }
+
+      const modelTabs = document.querySelectorAll('.model-tab');
+      modelTabs.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          currentShape = btn.getAttribute('data-shape') || 'mechCore';
+          heroModel = buildModel(currentShape);
+          modelTabs.forEach((b) => b.classList.toggle('active', b === btn));
+        });
+      });
+
+      const explodeBtn = document.getElementById('explode-view-btn');
+      if (explodeBtn) {
+        explodeBtn.addEventListener('click', () => {
+          targetExplode = targetExplode === 0 ? 1 : 0;
+          explodeBtn.setAttribute('aria-pressed', String(targetExplode === 1));
+          explodeBtn.textContent = targetExplode === 1 ? 'Exploded: ON' : 'Exploded: OFF';
+        });
+      }
+
+      const wireBtn = document.getElementById('wireframe-view-btn');
+      if (wireBtn) {
+        wireBtn.addEventListener('click', () => {
+          wireframeOnly = !wireframeOnly;
+          wireBtn.setAttribute('aria-pressed', String(wireframeOnly));
+          wireBtn.textContent = wireframeOnly ? 'Shading: WIRE' : 'Shading: SOLID';
+        });
+      }
+
+      // Интерактивная 3D Лаборатория волнового поля
+      const labCanvas = document.getElementById('lab-canvas');
+      const labCtx = labCanvas ? labCanvas.getContext('2d') : null;
+      let labFreq = 1.8;
+      let labAmp = 0.45;
+      let labSpeed = 1.2;
+      let labMode = 'wave'; // 'wave' | 'torus'
+      let labPulse = 0;
+
+      function resizeLab() {
+        if (!labCanvas) return;
+        const r = labCanvas.getBoundingClientRect();
+        labCanvas.width = Math.max(300, Math.floor(r.width));
+        labCanvas.height = Math.max(260, Math.floor(r.height));
+      }
+
+      const freqInput = document.getElementById('lab-freq');
+      const ampInput = document.getElementById('lab-amp');
+      const speedInput = document.getElementById('lab-speed');
+      const modeBtn = document.getElementById('lab-mode-btn');
+      const pulseBtn = document.getElementById('lab-pulse-btn');
+
+      if (freqInput) {
+        freqInput.addEventListener('input', () => {
+          labFreq = parseFloat(freqInput.value);
+          document.getElementById('lab-freq-val').textContent = `${labFreq.toFixed(1)}x`;
+        });
+      }
+      if (ampInput) {
+        ampInput.addEventListener('input', () => {
+          labAmp = parseFloat(ampInput.value);
+          document.getElementById('lab-amp-val').textContent = labAmp.toFixed(2);
+        });
+      }
+      if (speedInput) {
+        speedInput.addEventListener('input', () => {
+          labSpeed = parseFloat(speedInput.value);
+          document.getElementById('lab-speed-val').textContent = `${labSpeed.toFixed(1)}x`;
+        });
+      }
+      if (modeBtn) {
+        modeBtn.addEventListener('click', () => {
+          labMode = labMode === 'wave' ? 'torus' : 'wave';
+          modeBtn.textContent = labMode === 'wave' ? 'Режим: Волновая матрица' : 'Режим: Тороидальный узел';
+        });
+      }
+      if (pulseBtn) {
+        pulseBtn.addEventListener('click', () => { labPulse = 1.0; });
+      }
+
+      function renderLab(time) {
+        if (!labCtx || !labCanvas) return;
+        const w = labCanvas.width;
+        const h = labCanvas.height;
+        labCtx.clearRect(0, 0, w, h);
+
+        labPulse *= 0.93;
+        const cx = w / 2;
+        const cy = h / 2;
+        const scale = Math.min(w, h) * 0.28;
+        const t = time * labSpeed;
+        const amp = labAmp + labPulse * 0.45;
+
+        if (labMode === 'wave') {
+          const grid = 14;
+          const pts = [];
+          for (let gz = 0; gz < grid; gz++) {
+            const row = [];
+            for (let gx = 0; gx < grid; gx++) {
+              const nx = (gx / (grid - 1) - 0.5) * 2.6;
+              const nz = (gz / (grid - 1) - 0.5) * 2.6;
+              const dist = Math.hypot(nx, nz);
+              const ny = Math.sin(dist * labFreq * 2.2 - t * 2.4) * amp * 0.65;
+
+              const ry = time * 0.25;
+              const x1 = nx * Math.cos(ry) - nz * Math.sin(ry);
+              const z1 = nx * Math.sin(ry) + nz * Math.cos(ry);
+              const rx = 0.52;
+              const y2 = ny * Math.cos(rx) - z1 * Math.sin(rx);
+              const z2 = ny * Math.sin(rx) + z1 * Math.cos(rx);
+
+              const p = 4.2 / (4.2 - z2);
+              row.push({ sx: cx + x1 * scale * p, sy: cy - y2 * scale * p, ny });
+            }
+            pts.push(row);
+          }
+
+          for (let z = 0; z < grid; z++) {
+            for (let x = 0; x < grid; x++) {
+              const p = pts[z][x];
+              if (x + 1 < grid) {
+                const pRight = pts[z][x + 1];
+                labCtx.beginPath();
+                labCtx.moveTo(p.sx, p.sy);
+                labCtx.lineTo(pRight.sx, pRight.sy);
+                labCtx.strokeStyle = 'rgba(0, 255, 136, 0.32)';
+                labCtx.stroke();
+              }
+              if (z + 1 < grid) {
+                const pDown = pts[z + 1][x];
+                labCtx.beginPath();
+                labCtx.moveTo(p.sx, p.sy);
+                labCtx.lineTo(pDown.sx, pDown.sy);
+                labCtx.strokeStyle = 'rgba(0, 229, 255, 0.28)';
+                labCtx.stroke();
+              }
+              labCtx.beginPath();
+              labCtx.arc(p.sx, p.sy, 2, 0, Math.PI * 2);
+              labCtx.fillStyle = p.ny > 0 ? '#00ff88' : '#00e5ff';
+              labCtx.fill();
+            }
+          }
+        } else {
+          // 3D Тороидальный аттрактор
+          const steps = 160;
+          let prevPt = null;
+          for (let i = 0; i <= steps; i++) {
+            const u = (i / steps) * Math.PI * 2 * 3;
+            const pKnot = 2, qKnot = Math.max(3, Math.round(labFreq * 2));
+            const r = (0.85 + amp * 0.45 * Math.cos(qKnot * u / pKnot));
+            const nx = r * Math.cos(u);
+            const ny = r * Math.sin(u);
+            const nz = amp * 0.8 * Math.sin(qKnot * u / pKnot);
+
+            const x1 = nx * Math.cos(t * 0.6) - nz * Math.sin(t * 0.6);
+            const z1 = nx * Math.sin(t * 0.6) + nz * Math.cos(t * 0.6);
+            const y2 = ny * Math.cos(0.45) - z1 * Math.sin(0.45);
+            const z2 = ny * Math.sin(0.45) + z1 * Math.cos(0.45);
+
+            const persp = 4.0 / (4.0 - z2);
+            const sx = cx + x1 * scale * persp;
+            const sy = cy - y2 * scale * persp;
+
+            if (prevPt) {
+              labCtx.beginPath();
+              labCtx.moveTo(prevPt.sx, prevPt.sy);
+              labCtx.lineTo(sx, sy);
+              labCtx.strokeStyle = i % 2 === 0 ? 'rgba(0, 255, 136, 0.7)' : 'rgba(0, 229, 255, 0.7)';
+              labCtx.lineWidth = 1.6;
+              labCtx.stroke();
+            }
+            prevPt = { sx, sy };
+          }
+        }
+      }
+
+      // Сетка проектов
+      const gridEl = document.getElementById('projects-grid');
+      const cardCanvases = [];
+      let modalProject = null;
+
+      function renderProjects(cat) {
+        if (!gridEl) return;
+        cardCanvases.length = 0;
+        const norm = (cat || 'all').toLowerCase();
+        const list = norm === 'all' ? PROJECTS : PROJECTS.filter((p) => p.category === norm);
+        gridEl.innerHTML = '';
+
+        list.forEach((p) => {
+          const card = document.createElement('article');
+          card.className = 'project-card';
+          card.innerHTML = `
+            <div class="card-glare" aria-hidden="true"></div>
+            <div>
+              <div class="preview-box">
+                <canvas class="project-canvas" aria-label="3D превью ${p.title}"></canvas>
+              </div>
+              <div class="meta-line" style="margin-top: 16px;">
+                <span class="meta-accent">${p.categoryLabel}</span>
+                <span>·</span>
+                <span>${p.year}</span>
+                <span>·</span>
+                <span class="tabular">${p.polygons}</span>
+              </div>
+              <h3 class="project-title">${p.title}</h3>
+              <p class="project-summary" style="margin-top: 8px;">${p.summary}</p>
+            </div>
+            <div class="card-foot">
+              <span class="spec-text tabular">${p.fps} · ${p.client}</span>
+              <button type="button" class="btn-card">Детали 3D сцены</button>
+            </div>
+          `;
+
+          card.addEventListener('pointermove', (e) => {
+            const r = card.getBoundingClientRect();
+            const rx = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+            const ry = Math.max(0, Math.min(1, (e.clientY - r.top) / Math.max(1, r.height)));
+            card.style.transform = `perspective(1000px) rotateX(${((0.5 - ry) * 14).toFixed(2)}deg) rotateY(${((rx - 0.5) * 14).toFixed(2)}deg) translateY(-4px)`;
+            card.style.setProperty('--gx', `${Math.round(rx * 100)}%`);
+            card.style.setProperty('--gy', `${Math.round(ry * 100)}%`);
+          });
+
+          card.addEventListener('pointerleave', () => { card.style.transform = ''; });
+          card.querySelector('.btn-card').addEventListener('click', () => openModal(p));
+
+          gridEl.appendChild(card);
+
+          const cvs = card.querySelector('.project-canvas');
+          if (cvs) {
+            const r = cvs.parentElement.getBoundingClientRect();
+            cvs.width = Math.max(260, Math.floor(r.width || 380));
+            cvs.height = 220;
+            cardCanvases.push({ canvas: cvs, ctx: cvs.getContext('2d'), model: buildModel(p.shapeType) });
+          }
+        });
+
+        bindInteractiveTargets();
+      }
+
+      document.querySelectorAll('.filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const f = btn.getAttribute('data-filter') || 'all';
+          document.querySelectorAll('.filter-btn').forEach((b) => {
+            const active = b === btn;
+            b.classList.toggle('active', active);
+            b.setAttribute('aria-selected', String(active));
+          });
+          renderProjects(f);
+        });
+      });
+
+      // Модальное окно
+      const modalEl = document.getElementById('project-modal');
+      const closeBtn = document.getElementById('modal-close-btn');
+      const loadToHeroBtn = document.getElementById('modal-select-3d-btn');
+
+      function openModal(p) {
+        modalProject = p;
+        document.getElementById('modal-project-meta').innerHTML = `<span class="meta-accent">${p.categoryLabel}</span><span>·</span><span>${p.year}</span>`;
+        document.getElementById('modal-project-title').textContent = p.title;
+        document.getElementById('modal-project-desc').textContent = p.description;
+        document.getElementById('modal-project-client').textContent = p.client;
+        document.getElementById('modal-project-role').textContent = p.role;
+        document.getElementById('modal-project-perf').textContent = `${p.fps} · ${p.polygons}`;
+        document.getElementById('modal-project-arch').innerHTML = p.architecture.map((a) => `<li>• ${a}</li>`).join('');
+        if (modalEl) modalEl.classList.add('open');
+      }
+
+      function closeModal() {
+        if (modalEl) modalEl.classList.remove('open');
+      }
+
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (modalEl) modalEl.addEventListener('click', (e) => { if (e.target === modalEl) closeModal(); });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+      if (loadToHeroBtn) {
+        loadToHeroBtn.addEventListener('click', () => {
+          if (!modalProject) return;
+          currentShape = modalProject.shapeType;
+          heroModel = buildModel(currentShape);
+          modelTabs.forEach((b) => b.classList.toggle('active', b.getAttribute('data-shape') === currentShape));
+          closeModal();
+          document.getElementById('hero').scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+
+      // Эффект декодирования заголовков
+      const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*<>[]{}';
+      function decodeElement(el) {
+        const target = el.getAttribute('data-decoder') || el.textContent;
+        let step = 0;
+        const maxSteps = 20;
+        const interval = setInterval(() => {
+          step++;
+          const revealed = Math.floor((step / maxSteps) * target.length);
+          let str = '';
+          for (let i = 0; i < target.length; i++) {
+            if (target[i] === ' ') str += ' ';
+            else if (i < revealed || step >= maxSteps) str += target[i];
+            else str += CHARS[Math.floor(Math.random() * CHARS.length)];
+          }
+          el.textContent = str;
+          if (step >= maxSteps) {
+            clearInterval(interval);
+            el.textContent = target;
+          }
+        }, 30);
+      }
+
+      const decoders = document.querySelectorAll('[data-decoder]');
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              decodeElement(entry.target);
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.25 });
+        decoders.forEach((el) => io.observe(el));
+      } else {
+        decoders.forEach(decodeElement);
+      }
+
+      // Терминал
+      const termOut = document.getElementById('terminal-output');
+      const termForm = document.getElementById('terminal-form');
+      const termInput = document.getElementById('terminal-input');
+
+      function runCommand(raw) {
+        const cmd = (raw || '').trim().toLowerCase();
+        if (!termOut) return;
+
+        if (cmd === 'clear') {
+          termOut.innerHTML = '<div class="term-line accent">Консоль AirLock.3D очищена. Введите "help" для списка команд.</div>';
+          return;
+        }
+
+        const echo = document.createElement('div');
+        echo.className = 'term-line echo';
+        echo.textContent = `guest@airlock3d:~$ ${raw}`;
+        termOut.appendChild(echo);
+
+        let lines = [];
+        switch (cmd) {
+          case 'help':
+            lines = [
+              'Доступные команды терминала AirLock:',
+              '  help     — список доступных команд',
+              '  about    — об авторе (AirLock)',
+              '  skills   — стек технологий (3D, WebGL, Shaders)',
+              '  projects — список 3D и WebGL проектов',
+              '  3d       — переключить Exploded View на 3D-стенде',
+              '  clear    — очистить консоль'
+            ];
+            break;
+          case 'about':
+            lines = [
+              'AirLock — Creative Developer, 3D Artist & Procedural Animator.',
+              'Разрабатываю быстрые WebGL/Three.js сцены, процедурную 3D-геометрию,',
+              'шейдерные эффекты и интерактивные веб-интерфейсы.'
+            ];
+            break;
+          case 'skills':
+            lines = [
+              'Стек AirLock:',
+              '  • 3D & WebGL: Three.js, WebGL2, GLSL Shaders, Custom BufferGeometry (96%)',
+              '  • 3D Art: Blender, Houdini Procedural, Hard-Surface Modeling (95%)',
+              '  • Code: Native JS/TS, HTML5 Canvas 2D/3D, Web Audio API (98%)',
+              '  • Motion: Spring Kinematics, Morph Targets, Inverse Kinematics (94%)'
+            ];
+            break;
+          case 'projects':
+          case 'work':
+            lines = PROJECTS.map((p, i) => `  0${i + 1}. ${p.title} [${p.categoryLabel}] — ${p.polygons}, ${p.fps}`);
+            break;
+          case '3d':
+            targetExplode = targetExplode === 0 ? 1 : 0;
+            if (explodeBtn) {
+              explodeBtn.setAttribute('aria-pressed', String(targetExplode === 1));
+              explodeBtn.textContent = targetExplode === 1 ? 'Exploded: ON' : 'Exploded: OFF';
+            }
+            lines = [`Режим взрыв-схемы 3D-модели: ${targetExplode === 1 ? 'ON' : 'OFF'}.`];
+            break;
+          default:
+            lines = [`Команда "${raw}" не найдена. Введите "help" для списка команд.`];
+        }
+
+        lines.forEach((l) => {
+          const row = document.createElement('div');
+          row.className = 'term-line';
+          row.textContent = l;
+          termOut.appendChild(row);
+        });
+
+        termOut.scrollTop = termOut.scrollHeight;
+      }
+
+      if (termForm && termInput) {
+        termForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const val = termInput.value.trim();
+          if (!val) return;
+          runCommand(val);
+          termInput.value = '';
+          playSynth('click');
+        });
+      }
+
+      document.querySelectorAll('.chip-btn').forEach((btn) => {
+        btn.addEventListener('click', () => runCommand(btn.getAttribute('data-cmd') || 'help'));
+      });
+
+      // Единый цикл рендера
+      const startTime = performance.now();
+      const isSoftware = /HeadlessChrome|SwiftShader|llvmpipe/i.test(navigator.userAgent || '');
+
+      function nextTick(fn) {
+        if (isSoftware) setTimeout(() => requestAnimationFrame(fn), 45);
+        else requestAnimationFrame(fn);
+      }
+
+      function tick(now) {
+        const elapsed = (now - startTime) * 0.001;
+
+        ringX += (mouseX - ringX) * 0.22;
+        ringY += (mouseY - ringY) * 0.22;
+        if (cursorRing) {
+          const off = cursorRing.classList.contains('is-hover') ? 28 : 18;
+          cursorRing.style.transform = `translate3d(${ringX - off}px, ${ringY - off}px, 0)`;
+        }
+
+        renderHeroBg(elapsed);
+
+        if (!draggingHero) heroRotY += 0.0055;
+        currentExplode += (targetExplode - currentExplode) * 0.08;
+        if (heroObjCtx && heroObjCanvas) {
+          drawModel(heroObjCtx, heroObjCanvas.width, heroObjCanvas.height, heroModel, elapsed, heroRotX, heroRotY, currentExplode);
+        }
+
+        renderLab(elapsed);
+
+        cardCanvases.forEach((c, idx) => {
+          if (c.ctx && c.canvas) {
+            drawModel(c.ctx, c.canvas.width, c.canvas.height, c.model, elapsed + idx * 1.4, 0.32, elapsed * 0.45 + idx, 0);
+          }
+        });
+
+        nextTick(tick);
+      }
+
+      window.addEventListener('resize', () => {
+        resizeHeroBg();
+        resizeHeroObj();
+        resizeLab();
+      });
+
+      resizeHeroBg();
+      resizeHeroObj();
+      resizeLab();
+      initParticles();
+      renderProjects('all');
+      bindInteractiveTargets();
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
